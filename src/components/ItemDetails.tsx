@@ -25,13 +25,13 @@ export default function ItemDetails({ id }: ItemDetailsProps) {
   if (!item) return <div>Item not found</div>;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-background border border-border rounded-lg shadow-sm p-6">
       <h1 className="text-2xl font-bold mb-4">{item.name}</h1>
-      <p className="text-gray-600 mb-4">{item.description}</p>
+      <p className="opacity-90 mb-4">{item.description}</p>
       
       <div className="flex flex-wrap gap-2 mb-4">
         {item.tags.map((tag: string) => (
-          <span key={tag} className="bg-gray-100 px-3 py-1 rounded-full text-sm">
+          <span key={tag} className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
             {tag}
           </span>
         ))}
@@ -40,7 +40,7 @@ export default function ItemDetails({ id }: ItemDetailsProps) {
       {item.location && (
         <div className="mb-4">
           <h2 className="text-lg font-semibold mb-2">Location</h2>
-          <p className="text-gray-600">{item.location}</p>
+          <p className="opacity-90">{item.location}</p>
         </div>
       )}
 

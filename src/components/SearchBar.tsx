@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Input } from './ui/input';
 import { debounce } from '../lib/utils';
 
 export default function SearchBar() {
@@ -13,10 +14,10 @@ export default function SearchBar() {
   );
 
   return (
-    <div className="sticky top-0 bg-white z-10 py-4">
-      <input
+    <div className="sticky top-0 bg-background z-10 py-4">
+      <Input
         type="search"
-        className="w-full p-2 border rounded-lg"
+        className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         placeholder="Search items..."
         value={query}
         onChange={(e) => {

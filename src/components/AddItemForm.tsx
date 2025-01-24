@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { addItem } from '../lib/db';
 
 export default function AddItemForm() {
   const [formData, setFormData] = useState({
@@ -10,15 +11,40 @@ export default function AddItemForm() {
     tags: '',
     location: ''
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement form submission
-    console.log('Form submitted:', formData);
+    setSaving(true);
+    setError(null);
+    
+    try {
+      await addItem({
+        name: formData.name,
+        description: formData.description,
+        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
+        location: formData.location || undefined
+      });
+      
+      // Redirect to home page
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Error saving item:', err);
+      setError('Failed to save item. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="bg-red-100 dark:bg-red-900 border border-red-400 text-red-700 dark:text-red-200 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-medium mb-2">Name</label>
         <Input
@@ -26,6 +52,7 @@ export default function AddItemForm() {
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           required
+          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         />
       </div>
 
@@ -35,6 +62,7 @@ export default function AddItemForm() {
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           required
+          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         />
       </div>
 
@@ -45,6 +73,7 @@ export default function AddItemForm() {
           value={formData.tags}
           onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
           placeholder="tag1, tag2, tag3"
+          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         />
       </div>
 
@@ -55,21 +84,17 @@ export default function AddItemForm() {
           value={formData.location}
           onChange={(e) => setFormData({ ...formData, location: e.target.value })}
           placeholder="Optional location"
+          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-2">Photos</label>
-        <Input
-          type="file"
-          accept="image/*"
-          multiple
-          max="5"
-          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-        />
-      </div>
-
-      <Button type="submit" className="w-full">Add Item</Button>
+      <Button 
+        type="submit" 
+        disabled={saving}
+        className="w-full"
+      >
+        {saving ? 'Saving...' : 'Add Item'}
+      </Button>
     </form>
   );
 }

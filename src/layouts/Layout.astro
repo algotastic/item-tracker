@@ -18,8 +18,15 @@ const { title } = Astro.props;
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <link rel="manifest" href="/manifest.json">
+    <script is:inline>
+      // Initialize theme
+      const savedTheme = localStorage.getItem('theme');
+      const isDark = savedTheme === 'dark' || 
+        (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', isDark);
+    </script>
   </head>
-  <body class="min-h-screen bg-gray-50">
+  <body class="min-h-screen bg-gray-50 dark:bg-[#1e1e2d] dark:text-white">
     <Navigation />
     <main class="container mx-auto px-4 py-6">
       <slot />

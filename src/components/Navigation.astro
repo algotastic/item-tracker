@@ -1,23 +1,26 @@
 ---
+import ThemeToggle from './ThemeToggle';
+
 const links = [
   { href: '/', text: 'Home' },
   { href: '/add', text: 'Add Item' },
   { href: '/export', text: 'Export' }
 ];
 ---
-<nav class="bg-white shadow-sm">
+<nav class="bg-white dark:bg-gray-900 shadow-sm">
   <div class="container mx-auto px-4">
     <div class="flex items-center justify-between h-16">
-      <a href="/" class="text-xl font-bold">PWA App</a>
-      <div class="flex space-x-4">
+      <a href="/" class="text-xl font-bold dark:text-white">PWA App</a>
+      <div class="flex items-center space-x-4">
         {links.map(link => (
           <a 
             href={link.href}
-            class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
           >
             {link.text}
           </a>
         ))}
+        <ThemeToggle client:load />
       </div>
     </div>
   </div>
