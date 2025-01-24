@@ -1,11 +1,14 @@
 {
-  "name": "pwa-app",
+  "name": "orderly",
   "type": "module",
   "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "docker:dev": "docker-compose up",
+    "docker:build": "docker build -t orderly .",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up"
   },
   "dependencies": {
     "@astrojs/tailwind": "^5.0.2",

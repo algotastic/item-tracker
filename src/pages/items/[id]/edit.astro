@@ -1,6 +1,6 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import UpdateItemForm from '../../../components/UpdateItemForm';
+import EditItemForm from '../../../components/EditItemForm';
 
 const { id } = Astro.params;
 ---
@@ -8,6 +8,6 @@ const { id } = Astro.params;
 <Layout title="Edit Item">
   <div class="max-w-2xl mx-auto">
     <h1 class="text-2xl font-bold mb-6">Edit Item</h1>
-    <UpdateItemForm id={id} client:load />
+    <EditItemForm id={id} client:load />
   </div>
 </Layout>

@@ -4,11 +4,12 @@ import { exportToCsv } from '../lib/db';
 
 export default function ExportData() {
   const [exporting, setExporting] = useState(false);
+  const [includePhotos, setIncludePhotos] = useState(false);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      const data = await exportToCsv();
+      const data = await exportToCsv(includePhotos);
       const csv = convertToCSV(data);
       downloadCSV(csv);
     } catch (error) {
@@ -19,9 +20,10 @@ export default function ExportData() {
   };
 
   const convertToCSV = (data: any[]) => {
+    if (data.length === 0) return '';
     const headers = Object.keys(data[0]);
     const rows = data.map(item => 
-      headers.map(header => JSON.stringify(item[header])).join(',')
+      headers.map(header => JSON.stringify(item[header] || '')).join(',')
     );
     return [headers.join(','), ...rows].join('\n');
   };
@@ -40,7 +42,17 @@ export default function ExportData() {
 
   return (
     <div className="bg-card text-card-foreground rounded-lg shadow-sm p-6">
-      <p className="mb-4">Export your data as CSV. This will include all item details and photo URLs.</p>
+      <p className="mb-4">Export your data as CSV.</p>
+      <div className="flex items-center gap-2 mb-4">
+        <input
+          type="checkbox"
+          id="includePhotos"
+          checked={includePhotos}
+          onChange={(e) => setIncludePhotos(e.target.checked)}
+          className="rounded border-gray-300 dark:border-gray-700"
+        />
+        <label htmlFor="includePhotos">Include photo URLs in export</label>
+      </div>
       <Button 
         onClick={handleExport} 
         disabled={exporting}

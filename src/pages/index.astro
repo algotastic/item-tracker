@@ -1,12 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import SearchBar from '../components/SearchBar';
 import ItemList from '../components/ItemList';
 ---
 
 <Layout title="Home">
   <main class="container mx-auto px-4">
-    <SearchBar client:load />
     <ItemList client:load />
   </main>
 </Layout>
