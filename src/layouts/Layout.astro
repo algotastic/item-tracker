@@ -1,0 +1,28 @@
+---
+import '../styles/globals.css';
+import Navigation from '../components/Navigation.astro';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <link rel="manifest" href="/manifest.json">
+  </head>
+  <body class="min-h-screen bg-gray-50">
+    <Navigation />
+    <main class="container mx-auto px-4 py-6">
+      <slot />
+    </main>
+  </body>
+</html>
