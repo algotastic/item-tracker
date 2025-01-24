@@ -3,6 +3,9 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { getItem, updateItem } from '../lib/db';
+import LocationSelect from './LocationSelect';
+import TagInput from './TagInput';
+import PhotoUpload from './PhotoUpload';
 
 interface EditItemFormProps {
   id: string;
@@ -12,13 +15,14 @@ export default function EditItemForm({ id }: EditItemFormProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    tags: '',
-    location: '',
+    tags: [] as string[],
+    room: '',
+    spot: '',
     photos: [] as string[]
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadItem = async () => {
@@ -28,8 +32,9 @@ export default function EditItemForm({ id }: EditItemFormProps) {
           setFormData({
             name: item.name,
             description: item.description,
-            tags: item.tags.join(', '),
-            location: item.currentLocation || '',
+            tags: item.tags,
+            room: item.room,
+            spot: item.spot || '',
             photos: item.photos || []
           });
         }
@@ -44,40 +49,22 @@ export default function EditItemForm({ id }: EditItemFormProps) {
     loadItem();
   }, [id]);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({
-          ...prev,
-          photos: [...prev.photos, reader.result as string]
-        }));
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removePhoto = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      photos: prev.photos.filter((_, i) => i !== index)
-    }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     
     try {
+      if (!formData.room) {
+        throw new Error('Room is required');
+      }
+
       await updateItem(id, {
         name: formData.name,
         description: formData.description,
-        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
-        location: formData.location || undefined,
+        tags: formData.tags,
+        room: formData.room,
+        spot: formData.spot || undefined,
         photos: formData.photos
       });
       
@@ -85,7 +72,7 @@ export default function EditItemForm({ id }: EditItemFormProps) {
       window.location.href = `/items/${id}`;
     } catch (err) {
       console.error('Error updating item:', err);
-      setError('Failed to update item. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to update item. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -128,59 +115,22 @@ export default function EditItemForm({ id }: EditItemFormProps) {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-2">Tags (comma-separated)</label>
-        <Input
-          type="text"
-          value={formData.tags}
-          onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-          placeholder="tag1, tag2, tag3"
-          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-        />
-      </div>
+      <LocationSelect
+        selectedRoom={formData.room}
+        selectedSpot={formData.spot}
+        onRoomChange={(roomId) => setFormData({ ...formData, room: roomId, spot: '' })}
+        onSpotChange={(spotId) => setFormData({ ...formData, spot: spotId || '' })}
+      />
 
-      <div>
-        <label className="block text-sm font-medium mb-2">Location</label>
-        <Input
-          type="text"
-          value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-          placeholder="Optional location"
-          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-        />
-      </div>
+      <TagInput
+        selectedTags={formData.tags}
+        onChange={(tags) => setFormData({ ...formData, tags })}
+      />
 
-      <div>
-        <label className="block text-sm font-medium mb-2">Photos</label>
-        <Input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handlePhotoUpload}
-          className="mb-4"
-        />
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-          {formData.photos.map((photo, index) => (
-            <div key={index} className="relative">
-              <img
-                src={photo}
-                alt={`Photo ${index + 1}`}
-                className="w-full h-32 object-cover rounded"
-              />
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                className="absolute top-2 right-2"
-                onClick={() => removePhoto(index)}
-              >
-                Remove
-              </Button>
-            </div>
-          ))}
-        </div>
-      </div>
+      <PhotoUpload
+        photos={formData.photos}
+        onChange={(photos) => setFormData({ ...formData, photos })}
+      />
 
       <div className="flex gap-4">
         <Button 

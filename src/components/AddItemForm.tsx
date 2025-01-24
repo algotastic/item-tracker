@@ -3,13 +3,18 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { addItem } from '../lib/db';
+import LocationSelect from './LocationSelect';
+import TagInput from './TagInput';
+import PhotoUpload from './PhotoUpload';
 
 export default function AddItemForm() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    tags: '',
-    location: ''
+    tags: [] as string[],
+    room: '',
+    spot: '',
+    photos: [] as string[]
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,18 +25,24 @@ export default function AddItemForm() {
     setError(null);
     
     try {
+      if (!formData.room) {
+        throw new Error('Room is required');
+      }
+
       await addItem({
         name: formData.name,
         description: formData.description,
-        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
-        location: formData.location || undefined
+        tags: formData.tags,
+        room: formData.room,
+        spot: formData.spot || undefined,
+        photos: formData.photos
       });
       
       // Redirect to home page
       window.location.href = '/';
     } catch (err) {
       console.error('Error saving item:', err);
-      setError('Failed to save item. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to save item. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -66,35 +77,40 @@ export default function AddItemForm() {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-2">Tags (comma-separated)</label>
-        <Input
-          type="text"
-          value={formData.tags}
-          onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-          placeholder="tag1, tag2, tag3"
-          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-        />
-      </div>
+      <LocationSelect
+        selectedRoom={formData.room}
+        selectedSpot={formData.spot}
+        onRoomChange={(roomId) => setFormData({ ...formData, room: roomId, spot: '' })}
+        onSpotChange={(spotId) => setFormData({ ...formData, spot: spotId || '' })}
+      />
 
-      <div>
-        <label className="block text-sm font-medium mb-2">Location</label>
-        <Input
-          type="text"
-          value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-          placeholder="Optional location"
-          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-        />
-      </div>
+      <TagInput
+        selectedTags={formData.tags}
+        onChange={(tags) => setFormData({ ...formData, tags })}
+      />
 
-      <Button 
-        type="submit" 
-        disabled={saving}
-        className="w-full"
-      >
-        {saving ? 'Saving...' : 'Add Item'}
-      </Button>
+      <PhotoUpload
+        photos={formData.photos}
+        onChange={(photos) => setFormData({ ...formData, photos })}
+      />
+
+      <div className="flex gap-4">
+        <Button 
+          type="submit" 
+          disabled={saving}
+          className="flex-1"
+        >
+          {saving ? 'Saving...' : 'Add Item'}
+        </Button>
+        <Button 
+          type="button" 
+          variant="secondary"
+          onClick={() => window.location.href = '/'}
+          className="flex-1"
+        >
+          Cancel
+        </Button>
+      </div>
     </form>
   );
 }

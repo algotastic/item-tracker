@@ -1,17 +1,36 @@
-# PWA Item Tracker
+# Orderly
 
-A Progressive Web App for tracking items with location history and photo support.
+A modern inventory management system for organizing and tracking your items with detailed location tracking and tagging capabilities.
 
 ## Features
 
-- Add, edit, and view items
-- Track location history
-- Upload and manage photos
-- Search functionality
-- Dark mode support
-- CSV export
-- Offline support
-- Mobile-friendly design
+- **Location Tracking**
+  - Hierarchical location system with Rooms and Spots
+  - Track item movement history
+  - Required room assignment with optional spot specification
+
+- **Smart Tagging**
+  - Create and assign tags to items
+  - Intelligent tag suggestions while typing
+  - Filter items by multiple tags
+
+- **Advanced Search & Filtering**
+  - Real-time search functionality
+  - Filter by location (Room/Spot)
+  - Multi-tag filtering
+  - Combine search with filters
+
+- **Item Management**
+  - Add and edit items with rich details
+  - Upload and manage multiple photos
+  - Track location history
+  - Batch export capabilities
+
+- **User Experience**
+  - Mobile-first responsive design
+  - Dark mode support
+  - Offline functionality
+  - Progressive Web App (PWA)
 
 ## Running Locally
 
@@ -59,11 +78,17 @@ The app will be available at `http://localhost:4321`
 - IndexedDB for storage
 - Service Workers for offline support
 
-## Database
+## Data Storage
 
-The app uses IndexedDB for client-side storage. No additional database setup is required.
+Orderly uses IndexedDB for client-side storage with the following structure:
 
-Data is persisted in the browser and will remain available even when offline.
+- Items: Main inventory items with metadata
+- Rooms: Available rooms for item storage
+- Spots: Specific locations within rooms
+- Location History: Track item movements
+- Tags: Automatically managed through items
+
+Data persists in the browser and remains available offline.
 
 ## Contributing
 
