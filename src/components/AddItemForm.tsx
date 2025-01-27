@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { addItem } from '../lib/db';
+import { addItem, getRooms, initDb } from '../lib/db';
 import LocationSelect from './LocationSelect';
 import TagInput from './TagInput';
 import PhotoUpload from './PhotoUpload';
@@ -18,6 +18,23 @@ export default function AddItemForm() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const initializeDb = async () => {
+      try {
+        await initDb();
+        const rooms = await getRooms();
+        if (rooms.length > 0) {
+          setFormData(prev => ({ ...prev, room: rooms[0].id }));
+        }
+      } catch (err) {
+        console.error('Error initializing:', err);
+        setError('Failed to initialize database');
+      }
+    };
+
+    initializeDb();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +55,6 @@ export default function AddItemForm() {
         photos: formData.photos
       });
       
-      // Redirect to home page
       window.location.href = '/';
     } catch (err) {
       console.error('Error saving item:', err);
@@ -61,7 +77,7 @@ export default function AddItemForm() {
         <Input
           type="text"
           value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
           required
           className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         />
@@ -71,7 +87,7 @@ export default function AddItemForm() {
         <label className="block text-sm font-medium mb-2">Description</label>
         <Textarea
           value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
           required
           className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         />
@@ -80,18 +96,18 @@ export default function AddItemForm() {
       <LocationSelect
         selectedRoom={formData.room}
         selectedSpot={formData.spot}
-        onRoomChange={(roomId) => setFormData({ ...formData, room: roomId, spot: '' })}
-        onSpotChange={(spotId) => setFormData({ ...formData, spot: spotId || '' })}
+        onRoomChange={(roomId) => setFormData(prev => ({ ...prev, room: roomId }))}
+        onSpotChange={(spotId) => setFormData(prev => ({ ...prev, spot: spotId || '' }))}
       />
 
       <TagInput
         selectedTags={formData.tags}
-        onChange={(tags) => setFormData({ ...formData, tags })}
+        onChange={(tags) => setFormData(prev => ({ ...prev, tags }))}
       />
 
       <PhotoUpload
         photos={formData.photos}
-        onChange={(photos) => setFormData({ ...formData, photos })}
+        onChange={(photos) => setFormData(prev => ({ ...prev, photos }))}
       />
 
       <div className="flex gap-4">

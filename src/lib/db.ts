@@ -1,21 +1,18 @@
 import { openDB } from 'idb';
 
 const dbName = 'orderlyDB';
-const dbVersion = 2; // Increment version to force upgrade
+const dbVersion = 2;
 
-const initDb = async () => {
+export const initDb = async () => {
   return openDB(dbName, dbVersion, {
     upgrade(db, oldVersion, newVersion) {
-      // If rooms store exists, delete it to recreate
-      if (db.objectStoreNames.contains('rooms')) {
-        db.deleteObjectStore('rooms');
+      // Create rooms store if it doesn't exist
+      if (!db.objectStoreNames.contains('rooms')) {
+        const roomsStore = db.createObjectStore('rooms', { keyPath: 'id' });
+        roomsStore.createIndex('name', 'name');
       }
       
-      // Create rooms store without unique index initially
-      const roomsStore = db.createObjectStore('rooms', { keyPath: 'id' });
-      roomsStore.createIndex('name', 'name');
-      
-      // Create other stores if they don't exist
+      // Create items store if it doesn't exist
       if (!db.objectStoreNames.contains('items')) {
         const itemsStore = db.createObjectStore('items', { keyPath: 'id' });
         itemsStore.createIndex('tags', 'tags', { multiEntry: true });
@@ -39,6 +36,40 @@ const initDb = async () => {
   });
 };
 
+// Room operations
+export const addRoom = async (name: string) => {
+  const db = await initDb();
+  const tx = db.transaction('rooms', 'readwrite');
+  const store = tx.objectStore('rooms');
+  
+  // Check for existing room with the same name
+  const existingRooms = await store.index('name').getAll(name);
+  if (existingRooms.length > 0) {
+    await tx.done;
+    throw new Error('A room with this name already exists');
+  }
+
+  const id = crypto.randomUUID();
+  const room = { 
+    id, 
+    name,
+    createdAt: new Date().toISOString()
+  };
+  
+  await store.add(room);
+  await tx.done;
+  return id;
+};
+
+export const getRooms = async () => {
+  const db = await initDb();
+  const tx = db.transaction('rooms', 'readonly');
+  const store = tx.objectStore('rooms');
+  const rooms = await store.getAll();
+  await tx.done;
+  return rooms.sort((a, b) => a.name.localeCompare(b.name));
+};
+
 // Item operations
 export const addItem = async (item: {
   name: string;
@@ -60,6 +91,28 @@ export const addItem = async (item: {
 
   await addLocationHistory(id, item.room, item.spot);
   return id;
+};
+
+export const getItem = async (id: string) => {
+  const db = await initDb();
+  const item = await db.get('items', id);
+  
+  if (!item) {
+    return null;
+  }
+
+  const locationHistory = await db.getAllFromIndex(
+    'locationHistory',
+    'itemId',
+    id
+  );
+
+  return {
+    ...item,
+    locationHistory: locationHistory.sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    ),
+  };
 };
 
 export const updateItem = async (id: string, item: {
@@ -89,107 +142,6 @@ export const updateItem = async (id: string, item: {
   }
 };
 
-export const getItem = async (id: string) => {
-  const db = await initDb();
-  const item = await db.get('items', id);
-  
-  if (!item) {
-    return null;
-  }
-
-  const locationHistory = await db.getAllFromIndex(
-    'locationHistory',
-    'itemId',
-    id
-  );
-
-  return {
-    ...item,
-    locationHistory: locationHistory.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    ),
-  };
-};
-
-export const searchItems = async (query: string) => {
-  const db = await initDb();
-  const items = await db.getAll('items');
-  
-  if (!query) {
-    return items.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  }
-
-  const searchTerms = query.toLowerCase().split(' ');
-  return items
-    .filter(item => {
-      const searchText = `
-        ${item.name.toLowerCase()}
-        ${item.description.toLowerCase()}
-        ${item.tags.join(' ').toLowerCase()}
-      `;
-      return searchTerms.every(term => searchText.includes(term));
-    })
-    .sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-};
-
-// Room operations
-export const addRoom = async (name: string) => {
-  const db = await initDb();
-  
-  // Use a transaction to ensure consistency
-  const tx = db.transaction('rooms', 'readwrite');
-  const store = tx.objectStore('rooms');
-  
-  // Check for existing room with the same name
-  const existingRooms = await store.index('name').getAll(name);
-  if (existingRooms.length > 0) {
-    await tx.done; // Complete the transaction
-    throw new Error('A room with this name already exists');
-  }
-
-  const id = crypto.randomUUID();
-  const room = { 
-    id, 
-    name,
-    createdAt: new Date().toISOString()
-  };
-  
-  await store.add(room);
-  await tx.done; // Wait for transaction to complete
-  
-  console.log('Added room:', room);
-  return id;
-};
-
-export const getRooms = async () => {
-  const db = await initDb();
-  const tx = db.transaction('rooms', 'readonly');
-  const store = tx.objectStore('rooms');
-  const rooms = await store.getAll();
-  await tx.done;
-  
-  console.log('Retrieved rooms:', rooms);
-  return rooms.sort((a, b) => a.name.localeCompare(b.name));
-};
-
-// Spot operations
-export const addSpot = async (roomId: string, name: string) => {
-  const db = await initDb();
-  const id = crypto.randomUUID();
-  await db.add('spots', { id, roomId, name });
-  return id;
-};
-
-export const getSpotsByRoom = async (roomId: string) => {
-  const db = await initDb();
-  const spots = await db.getAllFromIndex('spots', 'roomId', roomId);
-  return spots.sort((a, b) => a.name.localeCompare(b.name));
-};
-
 // Location History operations
 export const addLocationHistory = async (itemId: string, room: string, spot?: string) => {
   const db = await initDb();
@@ -217,6 +169,32 @@ export const searchTags = async (query: string) => {
   return allTags.filter(tag => 
     tag.toLowerCase().includes(query.toLowerCase())
   );
+};
+
+// Search operations
+export const searchItems = async (query: string) => {
+  const db = await initDb();
+  const items = await db.getAll('items');
+  
+  if (!query) {
+    return items.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  const searchTerms = query.toLowerCase().split(' ');
+  return items
+    .filter(item => {
+      const searchText = `
+        ${item.name.toLowerCase()}
+        ${item.description.toLowerCase()}
+        ${item.tags.join(' ').toLowerCase()}
+      `;
+      return searchTerms.every(term => searchText.includes(term));
+    })
+    .sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 };
 
 // Export operations
