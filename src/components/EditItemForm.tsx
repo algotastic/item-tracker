@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
     import { Button } from './ui/button';
     import { Input } from './ui/input';
     import { Textarea } from './ui/textarea';
-    import { getItem, updateItem } from '../lib/db';
+    import { getItem, updateItem, initDb } from '../lib/db';
     import LocationSelect from './LocationSelect';
     import TagInput from './TagInput';
     import PhotoUpload from './PhotoUpload';
