@@ -3,9 +3,10 @@ import { searchItems } from '../lib/db';
 import ItemCard from './ItemCard';
 import SearchBar from './SearchBar';
 import FilterBar from './FilterBar';
+import { Item } from '../types/Item';
 
 export default function ItemList() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [query, setQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
