@@ -1,0 +1,13 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import EditItemForm from '../../../components/EditItemForm';
+
+const { id } = Astro.params;
+---
+
+<Layout title="Edit Item">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">Edit Item</h1>
+    <EditItemForm id={id} client:load />
+  </div>
+</Layout>

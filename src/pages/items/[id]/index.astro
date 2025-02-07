@@ -1,0 +1,17 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import ItemDetails from '../../../components/ItemDetails';
+
+const { id } = Astro.params;
+
+// This is required for dynamic routes in Astro
+export async function getStaticPaths() {
+  return [{ params: { id: 'placeholder' } }];
+}
+---
+
+<Layout title="View Item">
+  <div class="max-w-2xl mx-auto">
+    <ItemDetails id={id} client:load />
+  </div>
+</Layout>

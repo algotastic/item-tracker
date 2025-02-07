@@ -1,0 +1,95 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Add Room">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">Add New Room</h1>
+    
+    <!-- Success Message (hidden by default) -->
+    <div id="successMessage" class="hidden mb-6 p-4 bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-100 rounded-lg">
+      Room added successfully! You can now use it when adding items.
+      <div class="mt-2">
+        <a href="/add" class="text-green-800 dark:text-green-200 underline">Add an item</a>
+        or
+        <button id="addAnotherRoom" class="text-green-800 dark:text-green-200 underline">add another room</button>
+      </div>
+    </div>
+
+    <!-- Error Message (hidden by default) -->
+    <div id="errorMessage" class="hidden mb-6 p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-100 rounded-lg"></div>
+
+    <form id="addRoomForm" class="space-y-4">
+      <div>
+        <label for="room-name" class="block text-sm font-medium mb-2">Room Name</label>
+        <input 
+          type="text" 
+          id="room-name" 
+          name="room-name" 
+          required 
+          class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-white dark:bg-gray-800"
+        />
+      </div>
+      <button 
+        type="submit" 
+        class="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90"
+      >
+        Add Room
+      </button>
+    </form>
+  </div>
+</Layout>
+
+<script>
+  import { addRoom } from '../../lib/db';
+
+  const form = document.getElementById('addRoomForm') as HTMLFormElement;
+  const successMessage = document.getElementById('successMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const addAnotherRoom = document.getElementById('addAnotherRoom');
+  const input = document.getElementById('room-name') as HTMLInputElement;
+
+  const showSuccess = () => {
+    if (successMessage) {
+      successMessage.classList.remove('hidden');
+      form.classList.add('hidden');
+    }
+  };
+
+  const showError = (message: string) => {
+    if (errorMessage) {
+      errorMessage.textContent = message;
+      errorMessage.classList.remove('hidden');
+    }
+  };
+
+  const resetForm = () => {
+    if (successMessage && errorMessage && form) {
+      successMessage.classList.add('hidden');
+      errorMessage.classList.add('hidden');
+      form.classList.remove('hidden');
+      input.value = '';
+      form.reset();
+    }
+  };
+
+  addAnotherRoom?.addEventListener('click', resetForm);
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const roomName = input.value.trim();
+    
+    if (!roomName) return;
+
+    try {
+      await addRoom(roomName);
+      showSuccess();
+    } catch (error) {
+      if (error instanceof Error) {
+        showError(error.message);
+      } else {
+        showError('Failed to add room');
+      }
+    }
+  });
+</script>

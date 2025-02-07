@@ -1,0 +1,10 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ItemList from '../components/ItemList';
+---
+
+<Layout title="Home">
+  <main class="container mx-auto px-4">
+    <ItemList client:load />
+  </main>
+</Layout>
