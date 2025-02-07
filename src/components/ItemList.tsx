@@ -33,7 +33,7 @@ export default function ItemList() {
 
   // Get unique tags and locations from all items
   const allTags = [...new Set(items.flatMap(item => item.tags || []))];
-  const allLocations = [...new Set(items.map(item => item.currentLocation).filter(Boolean))];
+  const allLocations = [...new Set(items.map(item => item.currentLocation).filter((loc): loc is string => typeof loc === 'string'))];
 
   // Filter items based on search query and selected filters
   const filteredItems = items.filter(item => {
