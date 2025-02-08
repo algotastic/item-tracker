@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { X } from 'lucide-react';
+import { initDb } from '../lib/db';
 
 interface PhotoUploadProps {
   photos: string[];
@@ -11,25 +12,36 @@ interface PhotoUploadProps {
 export default function PhotoUpload({ photos, onChange }: PhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     setUploading(true);
-    const promises = Array.from(files).map(file => {
-      return new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          resolve(reader.result as string);
+    
+    const newPhotos = await Promise.all(
+      Array.from(files).map(async (file) => {
+        const s3Key = `photos/${crypto.randomUUID()}_${file.name}`;
+        const previewUrl = URL.createObjectURL(file);
+        
+        // Store locally until sync
+        const photo = {
+          s3Key,
+          thumbnailUrl: previewUrl,
+          fullResUrl: '',
+          uploaded: false
         };
-        reader.readAsDataURL(file);
-      });
-    });
+        
+        // Store original file in separate store
+        const db = await initDb();
+        const tx = db.transaction('photos', 'readwrite');
+        await tx.objectStore('photos').put(file, s3Key);
+        
+        return photo;
+      })
+    );
 
-    Promise.all(promises).then(newPhotos => {
-      onChange([...photos, ...newPhotos]);
-      setUploading(false);
-    });
+    onChange([...photos, ...newPhotos]);
+    setUploading(false);
   };
 
   const removePhoto = (index: number) => {

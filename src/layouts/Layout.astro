@@ -30,5 +30,17 @@ const { title } = Astro.props;
     <main class="container mx-auto px-4">
       <slot />
     </main>
+    <script is:inline>
+      // Sync on focus and periodically
+      const sync = () => {
+        if (navigator.onLine) {
+          import('../lib/sync').then(m => m.syncWithCloud());
+        }
+      };
+      
+      window.addEventListener('focus', sync);
+      setInterval(sync, 300000); // 5 minutes
+      navigator.serviceWorker?.ready.then(sw => sw.sync.register('db-sync'));
+    </script>
   </body>
 </html>

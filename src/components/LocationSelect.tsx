@@ -1,92 +1,80 @@
 import React, { useState, useEffect } from 'react';
-import { getRooms } from '../lib/db';
+import { getRooms, initDb } from '../lib/db';
 import { Label } from './ui/label';
 import { Select } from './ui/select';
-
-interface Room {
-  id: string;
-  name: string;
-}
+import { Item } from '../lib/db';
 
 interface LocationSelectProps {
-  selectedRoom: string;
-  selectedSpot?: string;
-  onRoomChange: (roomId: string) => void;
-  onSpotChange: (spotId?: string) => void;
+  selectedContainer?: string;
+  onContainerChange: (containerId?: string) => void;
+}
+
+interface ContainerTree {
+  id: string;
+  name: string;
+  children: ContainerTree[];
 }
 
 export default function LocationSelect({
-  selectedRoom,
-  selectedSpot,
-  onRoomChange,
-  onSpotChange
+  selectedContainer,
+  onContainerChange
 }: LocationSelectProps) {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [spots, setSpots] = useState<Array<{ id: string; name: string }>>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [containerTree, setContainerTree] = useState<ContainerTree[]>([]);
 
-  const loadRooms = async () => {
-    try {
-      const roomsList = await getRooms();
-      setRooms(roomsList);
-      
-      // If no room is selected and we have rooms, select the first one
-      if (!selectedRoom && roomsList.length > 0) {
-        onRoomChange(roomsList[0].id);
-      }
-    } catch (err) {
-      console.error('Error loading rooms:', err);
-      setError('Failed to load rooms');
-    }
+  const loadContainers = async () => {
+    const db = await initDb();
+    const allContainers = await db.items
+      .where('isContainer')
+      .equals(true)
+      .toArray();
+
+    // Build tree structure
+    const buildTree = (parentId?: string): ContainerTree[] => 
+      allContainers
+        .filter(c => c.location.containerId === parentId)
+        .map(container => ({
+          id: container.id,
+          name: container.name,
+          children: buildTree(container.id)
+        }));
+
+    setContainerTree(buildTree());
   };
 
-  // Load rooms on mount
   useEffect(() => {
-    loadRooms();
+    loadContainers();
   }, []);
+
+  const renderTree = (nodes: ContainerTree[], level = 0) => (
+    <>
+      {nodes.map(node => (
+        <React.Fragment key={node.id}>
+          <option 
+            value={node.id}
+            style={{ paddingLeft: `${level * 20}px` }}
+          >
+            {node.name}
+          </option>
+          {renderTree(node.children, level + 1)}
+        </React.Fragment>
+      ))}
+    </>
+  );
 
   return (
     <div className="space-y-4">
       <div>
-        <Label>Room (Required)</Label>
+        <Label>Container (Required)</Label>
         <Select
-          value={selectedRoom}
-          onChange={(e) => {
-            onRoomChange(e.target.value);
-            onSpotChange(undefined);
-          }}
+          value={selectedContainer || ''}
+          onChange={e => onContainerChange(e.target.value || undefined)}
           required
           className="w-full mt-2"
         >
-          <option value="">Select a room</option>
-          {rooms.map((room) => (
-            <option key={room.id} value={room.id}>
-              {room.name}
-            </option>
-          ))}
+          <option value="">Select container</option>
+          {renderTree(containerTree)}
         </Select>
-        {error && (
-          <p className="text-sm text-red-500 mt-1">{error}</p>
-        )}
       </div>
-
-      {selectedRoom && spots.length > 0 && (
-        <div>
-          <Label>Spot (Optional)</Label>
-          <Select
-            value={selectedSpot || ''}
-            onChange={(e) => onSpotChange(e.target.value || undefined)}
-            className="w-full mt-2"
-          >
-            <option value="">Select a spot</option>
-            {spots.map((spot) => (
-              <option key={spot.id} value={spot.id}>
-                {spot.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
     </div>
   );
 }

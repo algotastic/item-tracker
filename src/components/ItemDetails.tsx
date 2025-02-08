@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Button } from './ui/button';
 import { getItem } from '../lib/db';
+import { getContainerPath } from '../lib/containers';
+import type { Item } from '../types/Item';
+import { ChevronRight } from 'lucide-react';
+import { initDb } from '../lib/db';
 
 interface ItemDetailsProps {
   id: string;
@@ -21,10 +25,40 @@ const formatDate = (timestamp: string) => {
   return new Intl.DateTimeFormat('en-US', options).format(date);
 };
 
+function LocationPath({ path }: { path: string[] }) {
+  const [containers, setContainers] = useState<Item[]>([]);
+
+  useEffect(() => {
+    const loadContainers = async () => {
+      const db = await initDb();
+      const containerData = await Promise.all(
+        path.map(id => db.items.get(id))
+      );
+      setContainers(containerData.filter(Boolean));
+    };
+
+    loadContainers();
+  }, [path]);
+
+  return (
+    <div className="flex gap-1 flex-wrap">
+      {containers.map((container, index) => (
+        <Fragment key={container.id}>
+          <span>{container.name}</span>
+          {index < containers.length - 1 && (
+            <ChevronRight className="w-4 h-4 mx-1" />
+          )}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 export default function ItemDetails({ id }: ItemDetailsProps) {
-  const [item, setItem] = useState<any>(null);
+  const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [containerPath, setContainerPath] = useState('Loading location...');
 
   useEffect(() => {
     const loadItem = async () => {
@@ -45,6 +79,22 @@ export default function ItemDetails({ id }: ItemDetailsProps) {
 
     loadItem();
   }, [id]);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadPath = async () => {
+      try {
+        const path = await getContainerPath(item?.containerId);
+        if (isMounted) setContainerPath(path);
+      } catch {
+        if (isMounted) setContainerPath('Location unavailable');
+      }
+    };
+
+    if (item) loadPath();
+    return () => { isMounted = false };
+  }, [item]);
 
   if (loading) {
     return <div className="text-center py-8">Loading...</div>;
@@ -85,21 +135,21 @@ export default function ItemDetails({ id }: ItemDetailsProps) {
         </div>
       )}
 
-      {item.currentLocation && (
+      {item.location && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-2">Location</h2>
-          <p className="opacity-90">{item.currentLocation}</p>
+          <LocationPath path={item.location.path} />
         </div>
       )}
 
-      {item.photos?.length > 0 && (
+      {Array.isArray(item.photos) && item.photos.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-2">Photos</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {item.photos.map((photo: string, index: number) => (
+            {item.photos.map((photo, index) => (
               <img
                 key={index}
-                src={photo}
+                src={photo.thumbnailUrl}
                 alt={`Photo ${index + 1}`}
                 className="w-full h-48 object-cover rounded-lg"
               />

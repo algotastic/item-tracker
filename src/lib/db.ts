@@ -1,10 +1,52 @@
-import { openDB } from 'idb';
+import { IDBPObjectStore, openDB } from 'idb';
+import { Item } from '../types/Item';
+import { Room } from '../types/Room';
+import { LocationHistory } from '../types/LocationHistory';
+import { Photo } from '../types/Photo';
+import { SyncQueueItem } from '../types/SyncQueueItem';
+import { DBSchema } from 'idb';
 
 const dbName = 'orderlyDB';
 const dbVersion = 2;
 
+interface OrderlyDBSchema extends DBSchema {
+  items: {
+    key: string;
+    value: Item;
+    indexes: {
+      'tags': string[];
+      'room': string;
+      'createdAt': string;
+      'containerId': string;
+      'isContainer': boolean;
+      'lastSynced': Date;
+      'container_path': string[];
+      'container_immediate': string;
+    };
+  };
+  rooms: {
+    key: string;
+    value: Room;
+    indexes: { 'name': string };
+  };
+  locationHistory: {
+    key: string;
+    value: LocationHistory;
+    indexes: { 'itemId': string; 'timestamp': string };
+  };
+  syncQueue: {
+    key: number;
+    value: SyncQueueItem;
+    indexes: { 'itemId': string };
+  };
+  photos: {
+    key: string;
+    value: File;
+  };
+}
+
 export const initDb = async () => {
-  return openDB(dbName, dbVersion, {
+  return openDB<OrderlyDBSchema>(dbName, dbVersion, {
     upgrade(db, oldVersion, newVersion) {
       // Create rooms store if it doesn't exist
       if (!db.objectStoreNames.contains('rooms')) {
@@ -17,20 +59,26 @@ export const initDb = async () => {
         const itemsStore = db.createObjectStore('items', { keyPath: 'id' });
         itemsStore.createIndex('tags', 'tags', { multiEntry: true });
         itemsStore.createIndex('room', 'room');
-        itemsStore.createIndex('spot', 'spot');
         itemsStore.createIndex('createdAt', 'createdAt');
-      }
-
-      if (!db.objectStoreNames.contains('spots')) {
-        const spotsStore = db.createObjectStore('spots', { keyPath: 'id' });
-        spotsStore.createIndex('roomId', 'roomId');
-        spotsStore.createIndex('name', 'name');
+        itemsStore.createIndex('containerId', 'containerId');
+        itemsStore.createIndex('isContainer', 'isContainer');
+        itemsStore.createIndex('lastSynced', 'lastSynced');
+        itemsStore.createIndex('container_path', 'location.path', { multiEntry: true });
+        itemsStore.createIndex('container_immediate', 'location.containerId');
       }
 
       if (!db.objectStoreNames.contains('locationHistory')) {
-        const locationStore = db.createObjectStore('locationHistory', { keyPath: 'id' });
+        const locationStore = db.createObjectStore('locationHistory', { 
+          keyPath: 'id'
+        });
         locationStore.createIndex('itemId', 'itemId');
         locationStore.createIndex('timestamp', 'timestamp');
+      }
+
+      // Create sync queue store
+      if (!db.objectStoreNames.contains('syncQueue')) {
+        const syncStore = db.createObjectStore('syncQueue', { autoIncrement: true });
+        syncStore.createIndex('itemId', 'itemId');
       }
     },
   });
@@ -83,7 +131,7 @@ export const addItem = async (item: {
   const id = crypto.randomUUID();
   const timestamp = new Date().toISOString();
 
-  await db.add('items', {
+  await db.items.add({
     id,
     ...item,
     createdAt: timestamp,
@@ -95,17 +143,13 @@ export const addItem = async (item: {
 
 export const getItem = async (id: string) => {
   const db = await initDb();
-  const item = await db.get('items', id);
+  const item = await db.items.get(id);
   
   if (!item) {
     return null;
   }
 
-  const locationHistory = await db.getAllFromIndex(
-    'locationHistory',
-    'itemId',
-    id
-  );
+  const locationHistory = await db.locationHistory.index('itemId').getAll(id);
 
   return {
     ...item,
@@ -124,7 +168,7 @@ export const updateItem = async (id: string, item: {
   photos?: string[];
 }) => {
   const db = await initDb();
-  const existingItem = await db.get('items', id);
+  const existingItem = await db.items.get(id);
   
   if (!existingItem) {
     throw new Error('Item not found');
@@ -135,7 +179,7 @@ export const updateItem = async (id: string, item: {
     ...item,
   };
 
-  await db.put('items', updatedItem);
+  await db.items.put(updatedItem);
 
   if (item.room || item.spot) {
     await addLocationHistory(id, item.room || existingItem.room, item.spot);
@@ -147,7 +191,7 @@ export const addLocationHistory = async (itemId: string, room: string, spot?: st
   const db = await initDb();
   const id = crypto.randomUUID();
   
-  await db.add('locationHistory', {
+  await db.locationHistory.add({
     id,
     itemId,
     room,
@@ -159,7 +203,7 @@ export const addLocationHistory = async (itemId: string, room: string, spot?: st
 // Tag operations
 export const getAllTags = async () => {
   const db = await initDb();
-  const items = await db.getAll('items');
+  const items = await db.items.getAll();
   const tags = new Set(items.flatMap(item => item.tags || []));
   return Array.from(tags).sort();
 };
@@ -174,7 +218,7 @@ export const searchTags = async (query: string) => {
 // Search operations
 export const searchItems = async (query: string) => {
   const db = await initDb();
-  const items = await db.getAll('items');
+  const items = await db.items.getAll();
   
   if (!query) {
     return items.sort((a, b) => 
@@ -200,7 +244,7 @@ export const searchItems = async (query: string) => {
 // Export operations
 export const exportToCsv = async (includePhotos: boolean = false) => {
   const db = await initDb();
-  const items = await db.getAll('items');
+  const items = await db.items.getAll();
   const rooms = await getRooms();
   const roomMap = new Map(rooms.map(room => [room.id, room.name]));
 
@@ -216,34 +260,25 @@ export const exportToCsv = async (includePhotos: boolean = false) => {
   }));
 };
 
-// TypeScript interfaces
-export interface Item {
-  id: string;
-  name: string;
-  description: string;
-  tags: string[];
-  room: string;
-  spot?: string;
-  photos?: string[];
-  createdAt: string;
-}
+export async function recordItemMovement(
+  itemId: string,
+  newContainerId: string,
+  context?: 'packing' | 'unpacking'
+) {
+  const db = await initDb();
+  const item = await db.items.get(itemId);
+  const newContainer = await db.items.get(newContainerId);
 
-export interface Room {
-  id: string;
-  name: string;
-  createdAt: string;
-}
+  if (!item || !newContainer) return;
 
-export interface Spot {
-  id: string;
-  roomId: string;
-  name: string;
-}
+  const historyEntry = {
+    id: crypto.randomUUID(),
+    itemId,
+    fromPath: item.location.path,
+    toPath: [...newContainer.location.path, newContainerId],
+    timestamp: new Date().toISOString(),
+    context
+  };
 
-export interface LocationHistory {
-  id: string;
-  itemId: string;
-  room: string;
-  spot?: string;
-  timestamp: string;
+  await db.locationHistory.add(historyEntry);
 }
