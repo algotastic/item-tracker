@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getRooms, initDb } from '../lib/db';
 import { Label } from './ui/label';
-import { Select } from './ui/select';
-import { Item } from '../lib/db';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { getDb } from '../lib/db';
+import type { Item } from '../types/Item';
 
 interface LocationSelectProps {
   selectedContainer?: string;
@@ -20,46 +20,54 @@ export default function LocationSelect({
   onContainerChange
 }: LocationSelectProps) {
   const [containerTree, setContainerTree] = useState<ContainerTree[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const loadContainers = async () => {
-    const db = await initDb();
-    const allContainers = await db.items
-      .where('isContainer')
-      .equals(true)
-      .toArray();
+    const db = await getDb();
+    const tx = db.transaction('items', 'readonly');
+    
+    try {
+      const store = tx.objectStore('items');
+      const index = store.index('by-is-container');
+      const items = await index.getAll(1) as Item[];
+      await tx.done;
 
-    // Build tree structure
-    const buildTree = (parentId?: string): ContainerTree[] => 
-      allContainers
-        .filter(c => c.location.containerId === parentId)
-        .map(container => ({
-          id: container.id,
-          name: container.name,
-          children: buildTree(container.id)
-        }));
+      // Build tree structure
+      const buildTree = (parentId?: string): ContainerTree[] => 
+        items
+          .filter(c => c.location.containerId === parentId)
+          .map(container => ({
+            id: container.id,
+            name: container.name,
+            children: buildTree(container.id)
+          }));
 
-    setContainerTree(buildTree());
+      setContainerTree(buildTree());
+    } catch (error) {
+      console.error('Error loading containers:', error);
+      setError('Failed to load containers');
+    }
   };
 
   useEffect(() => {
     loadContainers();
   }, []);
 
-  const renderTree = (nodes: ContainerTree[], level = 0) => (
-    <>
-      {nodes.map(node => (
-        <React.Fragment key={node.id}>
-          <option 
-            value={node.id}
-            style={{ paddingLeft: `${level * 20}px` }}
-          >
-            {node.name}
-          </option>
-          {renderTree(node.children, level + 1)}
-        </React.Fragment>
-      ))}
-    </>
-  );
+  const renderTree = (nodes: ContainerTree[], level = 0): JSX.Element[] => 
+    nodes.flatMap(node => [
+      <SelectItem key={node.id} value={node.id}>
+        {'  '.repeat(level) + node.name}
+      </SelectItem>,
+      ...renderTree(node.children, level + 1)
+    ]);
+
+  if (error) {
+    return (
+      <div className="text-red-500">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -67,12 +75,15 @@ export default function LocationSelect({
         <Label>Container (Required)</Label>
         <Select
           value={selectedContainer || ''}
-          onChange={e => onContainerChange(e.target.value || undefined)}
-          required
-          className="w-full mt-2"
+          onValueChange={value => onContainerChange(value || undefined)}
         >
-          <option value="">Select container</option>
-          {renderTree(containerTree)}
+          <SelectTrigger className="w-full mt-2">
+            <SelectValue placeholder="Select container" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">None</SelectItem>
+            {renderTree(containerTree)}
+          </SelectContent>
         </Select>
       </div>
     </div>

@@ -1,13 +1,10 @@
-import { Photo } from "./Photo";
+import type { Photo } from './Photo';
 
 export interface ItemLocation {
-  containerId: string;
-  path: string[];
-  coordinates?: {
-    x: number;
-    y: number;
-    z: number;
-  };
+  type: 'container' | 'room';
+  containerId?: string; // ID of the container item if type is 'container'
+  roomId?: string;     // ID of the room if type is 'room'
+  path: string[];      // Path remains for hierarchy tracking
 }
 
 export interface Item {
@@ -15,15 +12,14 @@ export interface Item {
   name: string;
   description: string;
   tags: string[];
-  containerId?: string;
-  isContainer: boolean;
-  containerType?: 'permanent' | 'temporary';
   location: ItemLocation;
   photos?: Photo[];
-  insuredValue?: number;
-  purchaseDate?: Date;
-  serialNumber?: string;
+  isContainer: boolean;
+  containerType?: 'permanent' | 'temporary';
   createdAt: string;
   version: number;
   lastSynced?: Date;
+  insuredValue?: number;
+  purchaseDate?: Date;
+  serialNumber?: string;
 }

@@ -2,38 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { addItem, getRooms, initDb } from '../lib/db';
+import { addItem, getRooms } from '../lib/db';
 import LocationSelect from './LocationSelect';
 import TagInput from './TagInput';
 import PhotoUpload from './PhotoUpload';
+import type { Photo } from '../types/Photo';
 
 export default function AddItemForm() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     tags: [] as string[],
-    room: '',
-    spot: '',
-    photos: [] as string[]
+    location: {
+      type: 'room' as const,
+      containerId: '',
+      roomId: '',
+      path: [] as string[]
+    },
+    photos: [] as Photo[]
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const initializeDb = async () => {
+    const loadInitialData = async () => {
       try {
-        await initDb();
         const rooms = await getRooms();
         if (rooms.length > 0) {
-          setFormData(prev => ({ ...prev, room: rooms[0].id }));
+          setFormData(prev => ({ 
+            ...prev, 
+            location: {
+              ...prev.location,
+              roomId: rooms[0].id,
+              path: []
+            }
+          }));
         }
       } catch (err) {
-        console.error('Error initializing:', err);
-        setError('Failed to initialize database');
+        console.error('Error loading rooms:', err);
+        setError('Failed to load rooms');
       }
     };
 
-    initializeDb();
+    loadInitialData();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,16 +53,15 @@ export default function AddItemForm() {
     setError(null);
     
     try {
-      if (!formData.room) {
-        throw new Error('Room is required');
+      if (!formData.location.containerId) {
+        throw new Error('Container is required');
       }
 
       await addItem({
         name: formData.name,
         description: formData.description,
         tags: formData.tags,
-        room: formData.room,
-        spot: formData.spot || undefined,
+        location: formData.location,
         photos: formData.photos
       });
       
@@ -94,10 +104,16 @@ export default function AddItemForm() {
       </div>
 
       <LocationSelect
-        selectedRoom={formData.room}
-        selectedSpot={formData.spot}
-        onRoomChange={(roomId) => setFormData(prev => ({ ...prev, room: roomId }))}
-        onSpotChange={(spotId) => setFormData(prev => ({ ...prev, spot: spotId || '' }))}
+        selectedContainer={formData.location.containerId}
+        onContainerChange={(containerId) => 
+          setFormData(prev => ({ 
+            ...prev, 
+            location: {
+              ...prev.location,
+              containerId: containerId || ''
+            }
+          }))
+        }
       />
 
       <TagInput

@@ -1,90 +1,81 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { X } from 'lucide-react';
-import { initDb } from '../lib/db';
+import { Photo } from '../types/Photo';
 
 interface PhotoUploadProps {
-  photos: string[];
-  onChange: (photos: string[]) => void;
+  photos: Photo[];
+  onChange: (photos: Photo[]) => void;
 }
 
 export default function PhotoUpload({ photos, onChange }: PhotoUploadProps) {
-  const [uploading, setUploading] = useState(false);
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    setUploading(true);
-    
-    const newPhotos = await Promise.all(
-      Array.from(files).map(async (file) => {
-        const s3Key = `photos/${crypto.randomUUID()}_${file.name}`;
-        const previewUrl = URL.createObjectURL(file);
-        
-        // Store locally until sync
-        const photo = {
+    const newPhotos: Photo[] = await Promise.all(
+      files.map(async (file) => {
+        const s3Key = `${crypto.randomUUID()}-${file.name}`;
+        return {
           s3Key,
-          thumbnailUrl: previewUrl,
-          fullResUrl: '',
-          uploaded: false
+          thumbnailUrl: URL.createObjectURL(file),
+          fullResUrl: URL.createObjectURL(file),
+          uploaded: false,
         };
-        
-        // Store original file in separate store
-        const db = await initDb();
-        const tx = db.transaction('photos', 'readwrite');
-        await tx.objectStore('photos').put(file, s3Key);
-        
-        return photo;
       })
     );
 
     onChange([...photos, ...newPhotos]);
-    setUploading(false);
   };
 
-  const removePhoto = (index: number) => {
-    onChange(photos.filter((_, i) => i !== index));
+  const handleRemove = (index: number) => {
+    const newPhotos = [...photos];
+    newPhotos.splice(index, 1);
+    onChange(newPhotos);
   };
 
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-medium mb-2">Photos</label>
-      
-      <Input
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={handleFileChange}
-        disabled={uploading}
-        className="mb-4"
-      />
-      
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {photos.map((photo, index) => (
-          <div key={index} className="relative group">
-            <img
-              src={photo}
-              alt={`Photo ${index + 1}`}
-              className="w-full h-32 object-cover rounded-lg"
-            />
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => removePhoto(index)}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        ))}
+      <div className="flex items-center gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => document.getElementById('photo-upload')?.click()}
+        >
+          Add Photos
+        </Button>
+        <input
+          id="photo-upload"
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+        />
       </div>
 
-      {uploading && (
-        <div className="text-center text-sm text-gray-500">
-          Uploading photos...
+      {photos.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {photos.map((photo, index) => (
+            <div key={photo.s3Key} className="relative group">
+              <img
+                src={photo.thumbnailUrl}
+                alt=""
+                className="w-full h-32 object-cover rounded-lg"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemove(index)}
+                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                ×
+              </button>
+              {!photo.uploaded && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white text-sm">
+                  Uploading...
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

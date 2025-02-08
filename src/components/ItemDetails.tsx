@@ -1,13 +1,17 @@
 import React, { useState, useEffect, Fragment } from 'react';
 import { Button } from './ui/button';
-import { getItem } from '../lib/db';
+import { getItem, getDb } from '../lib/db';
 import { getContainerPath } from '../lib/containers';
 import type { Item } from '../types/Item';
+import type { LocationHistory } from '../types/LocationHistory';
 import { ChevronRight } from 'lucide-react';
-import { initDb } from '../lib/db';
 
 interface ItemDetailsProps {
   id: string;
+}
+
+interface ItemWithHistory extends Item {
+  locationHistory?: LocationHistory[];
 }
 
 const formatDate = (timestamp: string) => {
@@ -30,11 +34,14 @@ function LocationPath({ path }: { path: string[] }) {
 
   useEffect(() => {
     const loadContainers = async () => {
-      const db = await initDb();
+      const db = await getDb();
+      const tx = db.transaction('items', 'readonly');
+      const store = tx.objectStore('items');
       const containerData = await Promise.all(
-        path.map(id => db.items.get(id))
+        path.map(id => store.get(id))
       );
-      setContainers(containerData.filter(Boolean));
+      await tx.done;
+      setContainers(containerData.filter((c): c is Item => c !== undefined));
     };
 
     loadContainers();
@@ -55,7 +62,7 @@ function LocationPath({ path }: { path: string[] }) {
 }
 
 export default function ItemDetails({ id }: ItemDetailsProps) {
-  const [item, setItem] = useState<Item | null>(null);
+  const [item, setItem] = useState<ItemWithHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [containerPath, setContainerPath] = useState('Loading location...');
@@ -65,7 +72,7 @@ export default function ItemDetails({ id }: ItemDetailsProps) {
       try {
         const data = await getItem(id);
         if (data) {
-          setItem(data);
+          setItem(data as ItemWithHistory);
         } else {
           setError('Item not found');
         }
@@ -85,7 +92,7 @@ export default function ItemDetails({ id }: ItemDetailsProps) {
     
     const loadPath = async () => {
       try {
-        const path = await getContainerPath(item?.containerId);
+        const path = await getContainerPath(item?.location.containerId);
         if (isMounted) setContainerPath(path);
       } catch {
         if (isMounted) setContainerPath('Location unavailable');
@@ -158,13 +165,15 @@ export default function ItemDetails({ id }: ItemDetailsProps) {
         </div>
       )}
 
-      {item.locationHistory?.length > 0 && (
+      {Array.isArray(item.locationHistory) && item.locationHistory.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold mb-2">Location History</h2>
           <ul className="space-y-2">
-            {item.locationHistory.map((history: any, index: number) => (
-              <li key={index} className="opacity-90">
-                <span className="font-medium">{history.location}</span>
+            {item.locationHistory.map((history: LocationHistory) => (
+              <li key={history.id} className="opacity-90">
+                <span className="font-medium">
+                  {history.toPath.join(' → ')}
+                </span>
                 <br />
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   {formatDate(history.timestamp)}

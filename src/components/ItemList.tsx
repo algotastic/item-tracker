@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { searchItems } from '../lib/db';
+import { getContainerPath } from '../lib/containers';
 import ItemCard from './ItemCard';
 import SearchBar from './SearchBar';
 import FilterBar from './FilterBar';
-import { Item } from '../types/Item';
+import type { Item } from '../types/Item';
+
+interface ItemWithLocation extends Item {
+  currentLocation?: string;
+}
 
 export default function ItemList() {
   const [items, setItems] = useState<Item[]>([]);
@@ -12,6 +17,22 @@ export default function ItemList() {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [locationPaths, setLocationPaths] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const loadLocationPaths = async () => {
+      const paths: Record<string, string> = {};
+      for (const item of items) {
+        if (item.location?.containerId) {
+          paths[item.id] = await getContainerPath(item.location.containerId);
+        } else {
+          paths[item.id] = 'Unknown location';
+        }
+      }
+      setLocationPaths(paths);
+    };
+    loadLocationPaths();
+  }, [items]);
 
   const loadItems = async () => {
     try {
@@ -33,7 +54,7 @@ export default function ItemList() {
 
   // Get unique tags and locations from all items
   const allTags = [...new Set(items.flatMap(item => item.tags || []))];
-  const allLocations = [...new Set(items.map(item => item.currentLocation).filter((loc): loc is string => typeof loc === 'string'))];
+  const allLocations = [...new Set(Object.values(locationPaths))];
 
   // Filter items based on search query and selected filters
   const filteredItems = items.filter(item => {
@@ -42,7 +63,7 @@ export default function ItemList() {
       ${item.name.toLowerCase()}
       ${item.description.toLowerCase()}
       ${item.tags?.join(' ').toLowerCase() || ''}
-      ${item.currentLocation?.toLowerCase() || ''}
+      ${locationPaths[item.id]?.toLowerCase() || ''}
     `;
     const matchesSearch = query === '' || 
       query.toLowerCase().split(' ').every(term => searchText.includes(term));
@@ -53,7 +74,7 @@ export default function ItemList() {
 
     // Location filter
     const matchesLocation = !selectedLocation || 
-      item.currentLocation === selectedLocation;
+      locationPaths[item.id] === selectedLocation;
 
     return matchesSearch && matchesTags && matchesLocation;
   });
@@ -101,14 +122,20 @@ export default function ItemList() {
         {loading ? (
           <div className="col-span-full text-center py-8">Loading...</div>
         ) : filteredItems.length > 0 ? (
-          filteredItems.map((item) => (
-            <ItemCard 
-              key={item.id} 
-              item={item}
-              onTagClick={handleTagClick}
-              onLocationClick={handleLocationClick}
-            />
-          ))
+          filteredItems.map((item) => {
+            const itemWithLocation: ItemWithLocation = {
+              ...item,
+              currentLocation: locationPaths[item.id]
+            };
+            return (
+              <ItemCard 
+                key={item.id} 
+                item={itemWithLocation}
+                onTagClick={handleTagClick}
+                onLocationClick={handleLocationClick}
+              />
+            );
+          })
         ) : (
           <div className="col-span-full text-center py-8">
             No items found. {items.length > 0 ? 'Try different search terms or filters.' : 'Add some items to get started!'}

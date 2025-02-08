@@ -4,5 +4,15 @@ import react from '@astrojs/react';
 
 export default defineConfig({
   integrations: [tailwind(), react()],
-  output: 'server'  // Change to server-side rendering
+  output: 'server',  // Change to server-side rendering
+  vite: {
+    resolve: {
+      alias: {
+        '@': '/src',
+        '@lib': '/src/lib',
+        '@components': '/src/components',
+        '@types': '/src/types'
+      }
+    }
+  }
 });

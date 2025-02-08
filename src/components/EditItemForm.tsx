@@ -2,25 +2,46 @@ import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { getItem, updateItem, initDb } from '../lib/db';
+import { getItem, updateItem } from '../lib/db';
 import LocationSelect from './LocationSelect';
 import TagInput from './TagInput';
 import PhotoUpload from './PhotoUpload';
-import type { Item } from '../types/Item';
+import type { Item, ItemLocation } from '../types/Item';
+import type { Photo } from '../types/Photo';
+import { Switch } from './ui/switch';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
 
 interface EditItemFormProps {
   id: string;
 }
 
+interface FormData {
+  name: string;
+  description: string;
+  tags: string[];
+  location: ItemLocation;
+  photos: Photo[];
+  isContainer: boolean;
+  containerType?: 'permanent' | 'temporary';
+  insuredValue?: number;
+  purchaseDate?: string;
+  serialNumber?: string;
+  version: number;
+}
+
 export default function EditItemForm({ id }: EditItemFormProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
-    tags: [] as string[],
-    room: '',
-    spot: '',
-    photos: [] as string[],
-    containerId: '',
+    tags: [],
+    location: {
+      type: 'container',
+      containerId: '',
+      path: [],
+    },
+    photos: [],
+    isContainer: false,
+    version: 1,
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -35,10 +56,14 @@ export default function EditItemForm({ id }: EditItemFormProps) {
             name: item.name,
             description: item.description,
             tags: item.tags,
-            room: item.room,
-            spot: item.spot || '',
+            location: item.location,
             photos: item.photos || [],
-            containerId: item.containerId || '',
+            isContainer: item.isContainer,
+            containerType: item.containerType,
+            insuredValue: item.insuredValue,
+            purchaseDate: item.purchaseDate ? item.purchaseDate.toISOString().split('T')[0] : undefined,
+            serialNumber: item.serialNumber,
+            version: item.version || 1,
           });
         }
       } catch (err) {
@@ -58,19 +83,25 @@ export default function EditItemForm({ id }: EditItemFormProps) {
     setError(null);
     
     try {
-      if (!formData.room) {
-        throw new Error('Room is required');
+      if (!formData.location.containerId) {
+        throw new Error('Container is required');
       }
 
-      await updateItem(id, {
+      const itemUpdate: Partial<Omit<Item, 'id' | 'createdAt' | 'lastSynced'>> = {
         name: formData.name,
         description: formData.description,
         tags: formData.tags,
-        room: formData.room,
-        spot: formData.spot || undefined,
+        location: formData.location,
         photos: formData.photos,
-        containerId: formData.containerId || undefined,
-      });
+        isContainer: formData.isContainer,
+        containerType: formData.containerType,
+        insuredValue: formData.insuredValue,
+        purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate) : undefined,
+        serialNumber: formData.serialNumber,
+        version: formData.version,
+      };
+
+      await updateItem(id, itemUpdate);
       
       // Redirect to item view page
       window.location.href = `/items/${id}`;
@@ -80,6 +111,29 @@ export default function EditItemForm({ id }: EditItemFormProps) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLocationChange = (containerId?: string) => {
+    if (!containerId) {
+      setFormData(prev => ({
+        ...prev,
+        location: {
+          type: 'container',
+          containerId: '',
+          path: [],
+        }
+      }));
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      location: {
+        ...prev.location,
+        containerId,
+        // Path will be updated by the backend
+      }
+    }));
   };
 
   if (loading) {
@@ -120,13 +174,65 @@ export default function EditItemForm({ id }: EditItemFormProps) {
       </div>
 
       <LocationSelect
-        selectedContainer={formData.room}
-        onContainerChange={(containerId) => setFormData(prev => ({
-          ...prev,
-          room: containerId || '',
-          spot: ''
-        }))}
+        selectedContainer={formData.location.containerId}
+        onContainerChange={handleLocationChange}
       />
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          checked={formData.isContainer}
+          onCheckedChange={(checked) => setFormData({ ...formData, isContainer: checked })}
+        />
+        <label className="text-sm font-medium">Is Container</label>
+      </div>
+
+      {formData.isContainer && (
+        <div>
+          <label className="block text-sm font-medium mb-2">Container Type</label>
+          <Select value={formData.containerType || ''} onValueChange={(value) => 
+            setFormData({ ...formData, containerType: value as 'permanent' | 'temporary' | undefined })
+          }>
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">None</SelectItem>
+              <SelectItem value="permanent">Permanent</SelectItem>
+              <SelectItem value="temporary">Temporary</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Insured Value</label>
+        <Input
+          type="number"
+          value={formData.insuredValue || ''}
+          onChange={(e) => setFormData({ ...formData, insuredValue: e.target.value ? Number(e.target.value) : undefined })}
+          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Purchase Date</label>
+        <Input
+          type="date"
+          value={formData.purchaseDate || ''}
+          onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value || undefined })}
+          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Serial Number</label>
+        <Input
+          type="text"
+          value={formData.serialNumber || ''}
+          onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value || undefined })}
+          className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+        />
+      </div>
 
       <TagInput
         selectedTags={formData.tags}
@@ -158,9 +264,3 @@ export default function EditItemForm({ id }: EditItemFormProps) {
     </form>
   );
 }
-
-// Helper function to fetch rooms for selection
-const getRooms = async () => {
-  const db = await initDb();
-  return await db.getAll('rooms');
-};

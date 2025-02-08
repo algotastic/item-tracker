@@ -1,5 +1,5 @@
 export interface SyncQueueItem {
-  id: string;
+  id: number;
   itemId: string;
   operation: 'create' | 'update' | 'delete';
   timestamp: Date;
